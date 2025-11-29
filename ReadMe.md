@@ -5,7 +5,14 @@ HOW:
 By assigning unique cryptographic keys to each IoT device and integrating them into a personal smart-home server, the system becomes significantly harder for external actors to compromise.
 
 WHAT:
-We propose a new connection protocol that securely interfaces each device with the smart-home system and prevents unauthorised access. 
+We propose a new connection protocol that securely interfaces each device with the smart-home system and prevents unauthorised access.
 
 VISION:
 We ensure that your personal data is always protected, and you can feel safe within the home environment.
+
+
+
+Link to Jira: proman.atlassian.net/jira/software/projects/SCRUM/boards/1/backlog
+
+Link to GitHub repo: https://github.com/Ramosa5/Privacy-Tuned-Smart-Device-Protocol
+
