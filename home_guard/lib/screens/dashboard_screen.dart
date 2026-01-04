@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/bluetooth_manager.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -28,48 +29,22 @@ class DashboardScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          _StatCard(
-            title: 'Active Devices',
-            value: '3',
-            subtitle: 'Online & monitored',
-            icon: Icons.shield_moon_rounded,
-            colorScheme: colorScheme,
+
+          StreamBuilder<int>(
+            stream: BluetoothManager.instance.connectedCountStream,
+            initialData: BluetoothManager.instance.connectedCount,
+            builder: (context, snapshot) {
+              final count = snapshot.data ?? 0;
+
+              return _StatCard(
+                title: 'Connected Devices',
+                value: '$count',
+                subtitle: count == 0 ? 'No active connection' : 'Online & monitored',
+                icon: Icons.shield_moon_rounded,
+                colorScheme: colorScheme,
+              );
+            },
           ),
-          // const SizedBox(height: 12),
-          // _StatCard(
-          //   title: 'Alerts (24h)',
-          //   value: '0',
-          //   subtitle: 'Everything looks calm',
-          //   icon: Icons.notifications_paused_rounded,
-          //   colorScheme: colorScheme,
-          // ),
-          // const SizedBox(height: 24),
-          // const Text(
-          //   'Recent Activity',
-          //   style: TextStyle(
-          //     fontSize: 16,
-          //     fontWeight: FontWeight.w600,
-          //   ),
-          // ),
-          // const SizedBox(height: 12),
-          // _ActivityItem(
-          //   title: 'Living Room ESP32',
-          //   description: 'Heartbeat received via encrypted channel',
-          //   time: 'Just now',
-          //   icon: Icons.sensors_rounded,
-          // ),
-          // _ActivityItem(
-          //   title: 'Garage Door ESP32',
-          //   description: 'State: Closed',
-          //   time: '2h ago',
-          //   icon: Icons.garage_rounded,
-          // ),
-          // _ActivityItem(
-          //   title: 'Backyard Camera',
-          //   description: 'No motion detected',
-          //   time: '5h ago',
-          //   icon: Icons.videocam_rounded,
-          // ),
         ],
       ),
     );
@@ -145,70 +120,6 @@ class _StatCard extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActivityItem extends StatelessWidget {
-  final String title;
-  final String description;
-  final String time;
-  final IconData icon;
-
-  const _ActivityItem({
-    required this.title,
-    required this.description,
-    required this.time,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 24, color: colorScheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            time,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade500,
             ),
           ),
         ],
