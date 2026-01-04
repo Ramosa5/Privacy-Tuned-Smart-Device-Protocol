@@ -1,82 +1,81 @@
-import 'dart:typed_data';
-
+import 'dart:async';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import '../screens/protocol/smart_device_protocol.dart';
 
 class BluetoothManager {
-  BluetoothManager._internal();
+  BluetoothManager._();
+  static final BluetoothManager instance = BluetoothManager._();
 
-  static final BluetoothManager instance = BluetoothManager._internal();
+  StreamSubscription<List<ScanResult>>? _scanSub;
+  final StreamController<List<ScanResult>> _espResultsController =
+  StreamController.broadcast();
 
-  final FlutterBluePlus _flutterBlue = FlutterBluePlus.instance;
+  /// Stream wyników (już przefiltrowanych na ESP/ESP32/HomeGuard).
+  Stream<List<ScanResult>> get espScanResults => _espResultsController.stream;
 
-  Stream<List<ScanResult>> get scanResults => _flutterBlue.scanResults;
+  bool _isScanning = false;
+  bool get isScanning => _isScanning;
 
-  Future<void> startScan({Duration timeout = const Duration(seconds: 5)}) async {
-    await _flutterBlue.startScan(timeout: timeout);
+  final Map<String, ScanResult> _resultsById = {};
+
+  bool _isLikelyEsp32(ScanResult r) {
+    final name = r.device.platformName.trim();
+    if (name.isEmpty) return false;
+    final upper = name.toUpperCase();
+    return upper.contains('ESP32') ||
+        upper.contains('ESP') ||
+        upper.contains('HOMEGUARD');
+  }
+
+  Future<void> startEspScan({Duration timeout = const Duration(seconds: 6)}) async {
+    // wyczyść stare wyniki
+    _resultsById.clear();
+    _isScanning = true;
+    _emit();
+
+    // słuchaj wyników
+    _scanSub?.cancel();
+    _scanSub = FlutterBluePlus.scanResults.listen((results) {
+      for (final r in results) {
+        if (_isLikelyEsp32(r)) {
+          _resultsById[r.device.remoteId.str] = r;
+        }
+      }
+      _emit();
+    });
+
+    // uruchom skan
+    await FlutterBluePlus.startScan(timeout: timeout);
+
+    // po timeout skan sam się kończy
+    _isScanning = false;
+    _emit();
   }
 
   Future<void> stopScan() async {
-    await _flutterBlue.stopScan();
+    await FlutterBluePlus.stopScan();
+    _isScanning = false;
+    _emit();
   }
 
-  Future<void> connectToDevice(BluetoothDevice device) async {
-    await device.connect(autoConnect: false);
+  Future<BluetoothDevice> connect(ScanResult result,
+      {Duration timeout = const Duration(seconds: 12)}) async {
+    final device = result.device;
+    await device.connect(timeout: timeout, autoConnect: false);
+    return device;
   }
 
-  Future<void> disconnectDevice(BluetoothDevice device) async {
+  Future<void> disconnect(BluetoothDevice device) async {
     await device.disconnect();
   }
 
-  /// Example of sending encrypted payload to an ESP32 characteristic.
-  ///
-  /// - [device] must already be connected.
-  /// - [serviceUuid] and [characteristicUuid] should match your ESP32 firmware.
-  Future<void> sendEncrypted(
-      BluetoothDevice device, {
-        required Guid serviceUuid,
-        required Guid characteristicUuid,
-        required SmartDeviceProtocol protocol,
-        required Uint8List plainPayload,
-      }) async {
-    // Encrypt with your custom protocol
-    final encryptedPayload = await protocol.encrypt(plainPayload);
-
-    // Discover services / characteristics
-    final services = await device.discoverServices();
-    final targetService = services.firstWhere(
-          (s) => s.uuid == serviceUuid,
-      orElse: () => throw Exception('Service not found'),
-    );
-
-    final characteristic = targetService.characteristics.firstWhere(
-          (c) => c.uuid == characteristicUuid,
-      orElse: () => throw Exception('Characteristic not found'),
-    );
-
-    await characteristic.write(encryptedPayload, withoutResponse: false);
+  void _emit() {
+    final list = _resultsById.values.toList()
+      ..sort((a, b) => b.rssi.compareTo(a.rssi));
+    _espResultsController.add(list);
   }
 
-  /// Example of reading + decrypting from a characteristic.
-  Future<Uint8List> readDecrypted(
-      BluetoothDevice device, {
-        required Guid serviceUuid,
-        required Guid characteristicUuid,
-        required SmartDeviceProtocol protocol,
-      }) async {
-    final services = await device.discoverServices();
-    final targetService = services.firstWhere(
-          (s) => s.uuid == serviceUuid,
-      orElse: () => throw Exception('Service not found'),
-    );
-
-    final characteristic = targetService.characteristics.firstWhere(
-          (c) => c.uuid == characteristicUuid,
-      orElse: () => throw Exception('Characteristic not found'),
-    );
-
-    final cipherBytes = Uint8List.fromList(await characteristic.read());
-    final plainBytes = await protocol.decrypt(cipherBytes);
-    return plainBytes;
+  void dispose() {
+    _scanSub?.cancel();
+    _espResultsController.close();
   }
 }
